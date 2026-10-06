@@ -1,0 +1,71 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# fetch-status.yml
+# GitHub Actions workflow — runs every 15 minutes, fetches all vendor status
+# APIs, commits the resulting JSON to the repo, and deploys to GitHub Pages.
+#
+# Setup: see README.md → "Option B: GitHub Pages (team-shared + permanent history)"
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Fetch EHR Status
+
+on:
+  # Run every 15 minutes (GitHub's minimum is 5 min; 15 is a good balance)
+  schedule:
+    - cron: '*/15 * * * *'
+
+  # Also allow a manual run from the GitHub Actions tab
+  workflow_dispatch:
+
+# Allow the workflow to push commits back to the repo
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  fetch-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # 1. Check out the repo so we can read/write files
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 2. Set up Node.js 20 (has native fetch — no npm install needed)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 3. Run the fetch script
+      - name: Fetch vendor status data
+        run: node scripts/fetch-status.js
+
+      # 4. Commit the updated JSON files back to the repo.
+      #    If nothing changed, git commit will produce no new commit (idempotent).
+      - name: Commit updated data files
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet \
+            && echo "No data changes — skipping commit." \
+            || git commit -m "chore: update vendor status data [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          git push
+
+      # ── Optional: deploy to GitHub Pages ─────────────────────────────────
+      # The steps below publish index.html + data/ to GitHub Pages automatically.
+      # If you already have Pages enabled via "Deploy from a branch → main",
+      # you can delete everything from here to the end of the file.
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'      # serve the whole repo root (index.html lives here)
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
