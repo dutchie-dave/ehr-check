@@ -2,653 +2,910 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>EHR Intel Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EHR Status Intelligence — Sales Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0d1117;
-      color: #c9d1d9;
-      min-height: 100vh;
-      padding: 24px;
-    }
+    /* ── Animations ─────────────────────────────────────────────── */
+    @keyframes spin       { to { transform: rotate(360deg); } }
+    @keyframes pulse-dot  { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.4)} }
+    @keyframes fade-in    { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 24px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid #21262d;
-    }
+    .spin        { animation: spin 1s linear infinite; }
+    .pulse-dot   { animation: pulse-dot 1.6s ease-in-out infinite; }
+    .fade-in     { animation: fade-in .35s ease both; }
 
-    .header-left h1 { font-size: 22px; font-weight: 700; color: #f0f6fc; letter-spacing: -0.3px; }
-    .header-left p { font-size: 13px; color: #8b949e; margin-top: 4px; }
+    /* ── Vendor card ─────────────────────────────────────────────── */
+    .vendor-card            { transition: box-shadow .2s, transform .2s; }
+    .vendor-card:hover      { box-shadow: 0 10px 30px rgba(0,0,0,.1); transform: translateY(-2px); }
+    .card-outage            { box-shadow: 0 0 0 2px #ef4444, 0 4px 16px rgba(239,68,68,.18) !important; }
+    .card-recent            { box-shadow: 0 0 0 2px #f59e0b, 0 4px 16px rgba(245,158,11,.12) !important; }
 
-    .header-right { display: flex; align-items: center; gap: 12px; }
+    /* ── Status dot ──────────────────────────────────────────────── */
+    .sdot                   { display:inline-block; width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .sdot-green             { background:#22c55e; }
+    .sdot-amber             { background:#f59e0b; }
+    .sdot-red               { background:#ef4444; }
+    .sdot-blue              { background:#3b82f6; }
+    .sdot-gray              { background:#9ca3af; }
 
-    .summary-badge {
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 600;
-    }
-
-    .badge-all-good { background: #1a4731; color: #3fb950; border: 1px solid #3fb950; }
-    .badge-issues   { background: #4d2600; color: #f0883e; border: 1px solid #f0883e; }
-    .badge-outages  { background: #4d1919; color: #f85149; border: 1px solid #f85149; }
-    .badge-loading  { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
-
-    .refresh-btn {
-      background: #21262d;
-      border: 1px solid #30363d;
-      color: #c9d1d9;
-      padding: 6px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 13px;
-      transition: all 0.2s;
-    }
-    .refresh-btn:hover { background: #30363d; }
-
-    .last-updated { font-size: 12px; color: #8b949e; }
-
-    .statusgator-banner {
-      background: #2d1f3d;
-      border: 1px solid #6e40c9;
-      border-radius: 8px;
-      padding: 10px 16px;
-      margin-bottom: 24px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 13px;
-      color: #c9b1ff;
-    }
-
-    .section-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #8b949e;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 14px;
-    }
-
-    .status-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin-bottom: 28px;
-    }
-
-    .vendor-card {
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 10px;
-      padding: 18px;
-      transition: border-color 0.2s;
-    }
-    .vendor-card:hover { border-color: #58a6ff; }
-
-    .vendor-card.status-operational { border-left: 3px solid #3fb950; }
-    .vendor-card.status-degraded    { border-left: 3px solid #f0883e; }
-    .vendor-card.status-outage      { border-left: 3px solid #f85149; }
-    .vendor-card.status-unknown     { border-left: 3px solid #8b949e; }
-    .vendor-card.status-loading     { border-left: 3px solid #58a6ff; }
-
-    .vendor-top {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
-
-    .vendor-name { font-size: 15px; font-weight: 600; color: #f0f6fc; }
-
-    .status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      margin-top: 4px;
-      flex-shrink: 0;
-    }
-
-    .dot-operational { background: #3fb950; box-shadow: 0 0 6px #3fb950; }
-    .dot-degraded    { background: #f0883e; box-shadow: 0 0 6px #f0883e; }
-    .dot-outage      { background: #f85149; box-shadow: 0 0 6px #f85149; animation: pulse 1.5s infinite; }
-    .dot-unknown     { background: #8b949e; }
-    .dot-loading     { background: #58a6ff; animation: pulse 1.5s infinite; }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.4; }
-    }
-
-    .vendor-status-text { font-size: 13px; color: #8b949e; margin-bottom: 10px; }
-    .vendor-status-text.text-operational { color: #3fb950; }
-    .vendor-status-text.text-degraded    { color: #f0883e; }
-    .vendor-status-text.text-outage      { color: #f85149; }
-
-    .vendor-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .statusgator-tag {
-      background: #2d1f3d;
-      color: #c9b1ff;
-      border: 1px solid #6e40c9;
-      font-size: 10px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 4px;
-    }
-
-    .status-link { font-size: 11px; color: #58a6ff; text-decoration: none; }
-    .status-link:hover { text-decoration: underline; }
-
-    .bottom-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
-    .panel {
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 10px;
-      overflow: hidden;
-    }
-
-    .panel-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid #21262d;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .panel-title { font-size: 15px; font-weight: 600; color: #f0f6fc; }
-
-    .panel-count {
-      color: white;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 10px;
-      background: #3fb950;
-    }
-
-    .panel-body {
-      padding: 16px 20px;
-      max-height: 380px;
-      overflow-y: auto;
-    }
-
-    .trigger-item {
-      background: #0d1117;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      padding: 14px;
-      margin-bottom: 12px;
-    }
-    .trigger-item:last-child { margin-bottom: 0; }
-
-    .trigger-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-    }
-
-    .trigger-vendor { font-size: 13px; font-weight: 600; color: #f0f6fc; }
-
-    .trigger-signal {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 4px;
-    }
-
-    .signal-hot   { background: #4d1919; color: #f85149; border: 1px solid #f85149; }
-    .signal-warm  { background: #4d2600; color: #f0883e; border: 1px solid #f0883e; }
-    .signal-watch { background: #1a2a4d; color: #58a6ff; border: 1px solid #58a6ff; }
-
-    .trigger-message { font-size: 13px; color: #8b949e; margin-bottom: 8px; line-height: 1.5; }
-    .trigger-action  { font-size: 12px; color: #3fb950; font-weight: 500; }
-    .trigger-action::before { content: "→ "; }
-
-    .empty-state { text-align: center; padding: 40px 20px; color: #8b949e; font-size: 14px; }
-    .empty-state .icon { font-size: 32px; margin-bottom: 12px; }
-
-    .news-item {
-      padding: 14px 0;
-      border-bottom: 1px solid #21262d;
-    }
-    .news-item:last-child { border-bottom: none; }
-
-    .news-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-
-    .news-tag {
-      font-size: 10px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 4px;
-      text-transform: uppercase;
-    }
-
-    .tag-epic          { background: #1a3a6e; color: #79c0ff; }
-    .tag-oracle        { background: #4d1919; color: #ffa198; }
-    .tag-practicefusion{ background: #0f3d2e; color: #56d364; }
-    .tag-ecw           { background: #2d1f3d; color: #d2a8ff; }
-    .tag-tebra         { background: #3d2200; color: #ffa657; }
-    .tag-nextgen       { background: #1a3a2e; color: #7ee8a2; }
-    .tag-ehr           { background: #1c2128; color: #8b949e; }
-
-    .news-title {
-      font-size: 13px;
-      font-weight: 500;
-      color: #c9d1d9;
-      line-height: 1.5;
-      text-decoration: none;
-      display: block;
-    }
-    .news-title:hover { color: #58a6ff; }
-    .news-meta { font-size: 11px; color: #8b949e; margin-top: 4px; }
-
-    .loading-text { color: #8b949e; font-size: 13px; padding: 20px; text-align: center; }
-
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #0d1117; }
-    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
-
-    @media (max-width: 1200px) { .status-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 768px)  { .status-grid { grid-template-columns: 1fr; } .bottom-row { grid-template-columns: 1fr; } }
+    /* ── Collapsible incident history ────────────────────────────── */
+    .inc-body               { max-height:0; overflow:hidden; transition:max-height .4s ease; }
+    .inc-body.open          { max-height:4000px; }
+    .inc-chevron            { transition: transform .3s ease; }
+    .inc-chevron.open       { transform: rotate(180deg); }
   </style>
 </head>
-<body>
+<body class="bg-slate-50 min-h-screen text-slate-900">
 
-  <div class="header">
-    <div class="header-left">
-      <h1>🔍 EHR Intel Dashboard</h1>
-      <p>Live competitor status · Trigger events · Industry news</p>
+<!-- ═══════════════════════════════════════════════════════════════
+     TOP BAR
+═══════════════════════════════════════════════════════════════ -->
+<header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
+  <div class="max-w-7xl mx-auto px-5 py-3 flex items-center gap-4">
+
+    <div class="flex items-center gap-2.5 flex-1 min-w-0">
+      <span class="text-2xl">🏥</span>
+      <div>
+        <h1 class="text-sm font-bold text-slate-900 leading-tight">EHR Status Intelligence</h1>
+        <p class="text-xs text-slate-400">Live platform health · Sales prospecting tool</p>
+      </div>
     </div>
-    <div class="header-right">
-      <span class="last-updated" id="lastUpdated">Checking...</span>
-      <div class="summary-badge badge-loading" id="summaryBadge">⏳ Loading</div>
-      <button class="refresh-btn" onclick="init()">↻ Refresh</button>
+
+    <!-- Countdown -->
+    <div class="hidden sm:flex items-center gap-1 text-xs text-slate-400">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      Next refresh in&nbsp;<span id="countdown" class="font-semibold text-slate-700 tabular-nums">5:00</span>
+    </div>
+
+    <span id="last-updated" class="hidden sm:block text-xs text-slate-400">—</span>
+
+    <button id="refresh-btn" onclick="refreshAll()"
+      class="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95
+             text-white text-xs font-semibold rounded-lg transition-all">
+      <svg id="refresh-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11
+             11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+      Refresh Now
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ACTIVE OUTAGE ALERT BANNER
+═══════════════════════════════════════════════════════════════ -->
+<div id="outage-banner" class="hidden bg-red-600">
+  <div class="max-w-7xl mx-auto px-5 py-2.5 flex items-center gap-3">
+    <span class="pulse-dot text-base">🚨</span>
+    <p class="text-sm text-white flex-1">
+      <span class="font-bold">Active Outage: </span>
+      <span id="outage-banner-text"></span>
+    </p>
+    <span class="hidden sm:block text-xs bg-red-700 text-red-100 px-3 py-1 rounded-full font-medium">
+      🎯 Warm prospect — see red cards below
+    </span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MAIN
+═══════════════════════════════════════════════════════════════ -->
+<main class="max-w-7xl mx-auto px-5 py-8">
+
+  <!-- STATS BAR -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+    <div class="bg-white rounded-xl border border-slate-200 p-4 text-center shadow-sm">
+      <p class="text-3xl font-black text-slate-800" id="stat-total">—</p>
+      <p class="text-xs text-slate-400 uppercase tracking-wide mt-1 font-semibold">Vendors</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 p-4 text-center shadow-sm">
+      <p class="text-3xl font-black text-green-600" id="stat-ok">—</p>
+      <p class="text-xs text-slate-400 uppercase tracking-wide mt-1 font-semibold">Operational</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 p-4 text-center shadow-sm">
+      <p class="text-3xl font-black text-red-600" id="stat-down">—</p>
+      <p class="text-xs text-slate-400 uppercase tracking-wide mt-1 font-semibold">Active Issues</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 p-4 text-center shadow-sm">
+      <p class="text-3xl font-black text-amber-600" id="stat-recent">—</p>
+      <p class="text-xs text-slate-400 uppercase tracking-wide mt-1 font-semibold">7-Day Incidents</p>
     </div>
   </div>
 
-  <div class="statusgator-banner">
-    ⚠️ <strong>Note:</strong>&nbsp;Vendors marked "StatusGator" use unofficial aggregated reports — not vendor-confirmed data. Treat as a signal, not a guarantee.
+  <!-- VENDOR GRID -->
+  <div id="vendor-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+    <!-- Injected by JavaScript -->
   </div>
 
-  <div class="section-title">📡 Live EHR System Status</div>
-  <div class="status-grid" id="statusGrid"></div>
-
-  <div class="bottom-row">
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">⚡ Trigger Event Feed</span>
-        <span class="panel-count" id="triggerCount">0</span>
-      </div>
-      <div class="panel-body" id="triggerFeed">
-        <div class="loading-text">Analyzing signals...</div>
-      </div>
+  <!-- FOOTER INFO TILES -->
+  <div class="mt-10 grid sm:grid-cols-3 gap-4 text-xs">
+    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+      <p class="font-bold text-blue-800 mb-1.5">📡 Live Data Sources</p>
+      <p class="text-blue-700 leading-relaxed">
+        Data is pulled directly from each vendor's public Atlassian Statuspage JSON API.
+        No proxy or server required — your browser calls the endpoints directly.
+        Incident history is accumulated in your browser's local storage.
+      </p>
     </div>
-
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">📰 EHR Industry News</span>
-        <span style="font-size:12px;color:#8b949e;">Refreshes every 10 min</span>
-      </div>
-      <div class="panel-body" id="newsFeed">
-        <div class="loading-text">Fetching latest news...</div>
-      </div>
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+      <p class="font-bold text-amber-800 mb-1.5">⚠️ Vendors Without Public Feeds</p>
+      <p class="text-amber-700 leading-relaxed">
+        <strong>Epic, Oracle Health/Cerner,</strong> and <strong>ModMed</strong> do not publish
+        public status APIs. Their cards show "No Public Feed" with a link to check manually.
+        Consider a third-party uptime monitor (UptimeRobot) for these.
+      </p>
+    </div>
+    <div class="bg-green-50 border border-green-200 rounded-xl p-4">
+      <p class="font-bold text-green-800 mb-1.5">💡 Sales Prospecting Tip</p>
+      <p class="text-green-700 leading-relaxed">
+        Red cards = <strong>live outage</strong>, warm-call right now.
+        Amber cards = <strong>outage in last 3 days</strong>, pain is still fresh.
+        Yellow badge = <strong>incident in last 7 days</strong>, still a valid opener.
+        Click "Copy opener" for ready-to-send outreach text.
+      </p>
     </div>
   </div>
 
-  <script>
-    const VENDORS = [
-      {
-        id: 'epic',
-        name: 'Epic',
-        statusPage: 'https://status.epic.com/',
-        apiUrl: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://status.epic.com/api/v2/summary.json'),
-        type: 'official'
-      },
-      {
-        id: 'oracle',
-        name: 'Oracle Health',
-        statusPage: 'https://status.oraclehealth.com/',
-        apiUrl: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://status.oraclehealth.com/api/v2/summary.json'),
-        type: 'official'
-      },
-      {
-        id: 'practicefusion',
-        name: 'Practice Fusion',
-        statusPage: 'https://status.practicefusion.com/',
-        apiUrl: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://status.practicefusion.com/api/v2/summary.json'),
-        type: 'official'
-      },
-      {
-        id: 'ecw',
-        name: 'eClinicalWorks',
-        statusPage: 'https://statusgator.com/services/eclinicalworks',
-        apiUrl: null,
-        type: 'statusgator'
-      },
-      {
-        id: 'tebra',
-        name: 'Tebra',
-        statusPage: 'https://status.tebra.com/',
-        apiUrl: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://status.tebra.com/api/v2/summary.json'),
-        type: 'official'
-      },
-      {
-        id: 'modmed',
-        name: 'Modernizing Medicine',
-        statusPage: 'https://status.modmed.com/',
-        apiUrl: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://status.modmed.com/api/v2/summary.json'),
-        type: 'official'
-      },
-      {
-        id: 'nextgen',
-        name: 'NextGen',
-        statusPage: 'https://status.nextgen.com/',
-        apiUrl: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://status.nextgen.com/api/v2/summary.json'),
-        type: 'official'
-      },
-      {
-        id: 'drchrono',
-        name: 'DrChrono',
-        statusPage: 'https://statusgator.com/services/drchrono',
-        apiUrl: null,
-        type: 'statusgator'
-      }
-    ];
+</main><!-- /main -->
 
-    let statusResults = {};
+<!-- ═══════════════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
 
-    async function fetchVendorStatus(vendor) {
-      if (vendor.type === 'statusgator') {
-        return { indicator: 'statusgator', description: 'Check StatusGator' };
-      }
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-        const res = await fetch(vendor.apiUrl, { signal: controller.signal });
-        clearTimeout(timeout);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        const indicator = data?.status?.indicator || 'unknown';
-        const description = data?.status?.description || 'Status Unknown';
-        return { indicator, description };
-      } catch (err) {
-        return { indicator: 'unknown', description: 'Unable to Reach' };
-      }
-    }
+/* ──────────────────────────────────────────────────────────────
+   VENDOR CONFIGURATION
+   Add, remove, or edit entries here to change the dashboard.
+   type: 'statuspage' = has public Atlassian Statuspage API
+         'none'       = no public feed
+────────────────────────────────────────────────────────────── */
+const VENDORS = [
+  {
+    id:           'athenahealth',
+    name:         'athenahealth',
+    description:  'Cloud EHR / RCM for ambulatory practices',
+    emoji:        '⚕️',
+    accent:       '#0066cc',
+    statusBase:   'https://status.athenahealth.com',
+    statusPageUrl:'https://status.athenahealth.com',
+    type:         'statuspage',
+    isOwn:        true,
+    isTarget:     false,
+    noFeedNote:   null,
+  },
+  {
+    id:           'eclinicalworks',
+    name:         'eClinicalWorks',
+    description:  'EHR & PM for independent practices',
+    emoji:        '🏥',
+    accent:       '#e31837',
+    statusBase:   'https://status.eclinicalworks.com',
+    statusPageUrl:'https://status.eclinicalworks.com',
+    type:         'statuspage',
+    isOwn:        false,
+    isTarget:     true,
+    noFeedNote:   null,
+  },
+  {
+    id:           'practicefusion',
+    name:         'Practice Fusion',
+    description:  'Value EHR for small independent practices',
+    emoji:        '💊',
+    accent:       '#7c3aed',
+    statusBase:   'https://status.practicefusion.com',
+    statusPageUrl:'https://status.practicefusion.com',
+    type:         'statuspage',
+    isOwn:        false,
+    isTarget:     true,
+    noFeedNote:   null,
+  },
+  {
+    id:           'tebra',
+    name:         'Tebra (Kareo)',
+    description:  'EHR + billing for independent practices',
+    emoji:        '📋',
+    accent:       '#0891b2',
+    statusBase:   'https://status.tebra.com',
+    statusPageUrl:'https://status.tebra.com',
+    type:         'statuspage',
+    isOwn:        false,
+    isTarget:     true,
+    noFeedNote:   null,
+  },
+  {
+    id:           'drchrono',
+    name:         'DrChrono',
+    description:  'Mobile-first EHR for smaller practices',
+    emoji:        '📱',
+    accent:       '#059669',
+    statusBase:   'https://status.drchrono.com',
+    statusPageUrl:'https://status.drchrono.com',
+    type:         'statuspage',
+    isOwn:        false,
+    isTarget:     true,
+    noFeedNote:   null,
+  },
+  {
+    id:           'advancedmd',
+    name:         'AdvancedMD',
+    description:  'All-in-one EHR for independent practices',
+    emoji:        '💡',
+    accent:       '#d97706',
+    statusBase:   'https://status.advancedmd.com',
+    statusPageUrl:'https://status.advancedmd.com',
+    type:         'statuspage',
+    isOwn:        false,
+    isTarget:     true,
+    noFeedNote:   null,
+  },
+  {
+    id:           'nextgen',
+    name:         'NextGen Healthcare',
+    description:  'Mid-market specialty & ambulatory EHR',
+    emoji:        '🔵',
+    accent:       '#2563eb',
+    statusBase:   'https://nextgen.statuspage.io',
+    statusPageUrl:'https://nextgen.statuspage.io',
+    type:         'statuspage',
+    isOwn:        false,
+    isTarget:     true,
+    noFeedNote:   null,
+  },
+  {
+    id:           'veradigm',
+    name:         'Veradigm (Allscripts)',
+    description:  'vSuite EHR for multi-specialty groups',
+    emoji:        '🔶',
+    accent:       '#ea580c',
+    statusBase:   'https://status.vsuite.veradigmcloud.com',
+    statusPageUrl:'https://status.vsuite.veradigmcloud.com',
+    type:         'statuspage',
+    isOwn:        false,
+    isTarget:     true,
+    noFeedNote:   null,
+  },
+  {
+    id:           'greenway',
+    name:         'Greenway Health',
+    description:  'Intergy / Prime Suite for independent practices',
+    emoji:        '🌿',
+    accent:       '#16a34a',
+    statusBase:   'https://greenway.statuspage.io',
+    statusPageUrl:'https://greenway.statuspage.io',
+    type:         'statuspage',
+    isOwn:        false,
+    isTarget:     true,
+    noFeedNote:   null,
+  },
+  {
+    id:           'modmed',
+    name:         'ModMed',
+    description:  'Specialty EHR — Derm, Ortho, Ophthalmology',
+    emoji:        '🩺',
+    accent:       '#7c3aed',
+    statusBase:   null,
+    statusPageUrl:'https://www.modmed.com/support/',
+    type:         'none',
+    isOwn:        false,
+    isTarget:     true,
+    noFeedNote:   'ModMed has no public status page. Check their support portal, or ask your champion directly about recent downtime.',
+  },
+  {
+    id:           'epic',
+    name:         'Epic Systems',
+    description:  'Large health system EHR — status is client-specific',
+    emoji:        '🏛️',
+    accent:       '#6b7280',
+    statusBase:   null,
+    statusPageUrl:'https://userweb.epic.com/',
+    type:         'none',
+    isOwn:        false,
+    isTarget:     false,
+    noFeedNote:   "Epic's status portal requires client login and is per-health-system. No public feed of any kind.",
+  },
+  {
+    id:           'oraclehealth',
+    name:         'Oracle Health (Cerner)',
+    description:  'Cerner Millennium — gated client portal',
+    emoji:        '🔴',
+    accent:       '#dc2626',
+    statusBase:   null,
+    statusPageUrl:'https://status.oraclehealth.com/',
+    type:         'none',
+    isOwn:        false,
+    isTarget:     false,
+    noFeedNote:   'Oracle Health status requires client login. The OCI infrastructure status at ocistatus.oraclecloud.com is public but covers infrastructure, not clinical applications.',
+  },
+];
 
-    function getCardClass(indicator) {
-      if (indicator === 'none') return 'status-operational';
-      if (indicator === 'minor') return 'status-degraded';
-      if (indicator === 'major' || indicator === 'critical') return 'status-outage';
-      return 'status-unknown';
-    }
 
-    function getDotClass(indicator) {
-      if (indicator === 'none') return 'dot-operational';
-      if (indicator === 'minor') return 'dot-degraded';
-      if (indicator === 'major' || indicator === 'critical') return 'dot-outage';
-      return 'dot-unknown';
-    }
+/* ──────────────────────────────────────────────────────────────
+   CONSTANTS & STATE
+────────────────────────────────────────────────────────────── */
+const HISTORY_KEY         = 'ehr_intel_history_v4';
+const REFRESH_MS          = 5 * 60 * 1000;
+const HISTORY_MAX_PER_VDR = 60;
 
-    function getStatusTextClass(indicator) {
-      if (indicator === 'none') return 'text-operational';
-      if (indicator === 'minor') return 'text-degraded';
-      if (indicator === 'major' || indicator === 'critical') return 'text-outage';
-      return '';
-    }
+let liveData      = {};
+let fetchErrors   = {};
+let isRefreshing  = false;
+let nextRefreshAt = null;
+let countdownTmr  = null;
 
-    function getStatusLabel(indicator, description) {
-      if (indicator === 'statusgator') return 'Via StatusGator — check manually';
-      if (indicator === 'none') return '✓ ' + (description || 'All Systems Operational');
-      if (indicator === 'minor') return '⚡ ' + (description || 'Minor Issues Detected');
-      if (indicator === 'major') return '⚠ ' + (description || 'Major Outage');
-      if (indicator === 'critical') return '🔴 ' + (description || 'Critical Outage');
-      return description || 'Status Unknown';
-    }
+let history = (() => {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}'); }
+  catch { return {}; }
+})();
 
-    function renderVendorCard(vendor, result) {
-      return `
-        <div class="vendor-card ${getCardClass(result.indicator)}">
-          <div class="vendor-top">
-            <div class="vendor-name">${vendor.name}</div>
-            <div class="status-dot ${getDotClass(result.indicator)}"></div>
-          </div>
-          <div class="vendor-status-text ${getStatusTextClass(result.indicator)}">
-            ${getStatusLabel(result.indicator, result.description)}
-          </div>
-          <div class="vendor-footer">
-            ${vendor.type === 'statusgator' ? '<span class="statusgator-tag">⚠ StatusGator</span>' : '<span></span>'}
-            <a href="${vendor.statusPage}" target="_blank" class="status-link">View Status ↗</a>
-          </div>
-        </div>
-      `;
-    }
+function persistHistory() {
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); }
+  catch(e) { console.warn('localStorage write failed:', e.message); }
+}
 
-    function buildTriggerFeed() {
-      const feed = document.getElementById('triggerFeed');
-      const triggers = [];
 
-      VENDORS.forEach(vendor => {
-        const result = statusResults[vendor.id];
-        if (!result) return;
+/* ──────────────────────────────────────────────────────────────
+   FETCH HELPERS
+────────────────────────────────────────────────────────────── */
+async function fetchJSON(url, timeoutMs = 10000) {
+  const ctrl = new AbortController();
+  const t    = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal, cache: 'no-cache' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } catch(e) {
+    throw new Error(e.name === 'AbortError' ? 'Request timed out' : e.message);
+  } finally {
+    clearTimeout(t);
+  }
+}
 
-        if (result.indicator === 'major' || result.indicator === 'critical') {
-          triggers.push({
-            vendor: vendor.name,
-            signal: 'HOT',
-            signalClass: 'signal-hot',
-            message: `<strong>${vendor.name}</strong> is experiencing a full outage. Practices on this system cannot access patient records or billing right now.`,
-            action: `Call ${vendor.name} practices immediately — pain is at its peak`
-          });
-        } else if (result.indicator === 'minor') {
-          triggers.push({
-            vendor: vendor.name,
-            signal: 'WARM',
-            signalClass: 'signal-warm',
-            message: `<strong>${vendor.name}</strong> is reporting degraded performance. Practices are likely frustrated but still operational.`,
-            action: `Reach out today — lead with "we heard ${vendor.name} has had some reliability issues..."`
-          });
-        } else if (result.indicator === 'statusgator') {
-          triggers.push({
-            vendor: vendor.name,
-            signal: 'WATCH',
-            signalClass: 'signal-watch',
-            message: `<strong>${vendor.name}</strong> status is via StatusGator (unofficial). Verify manually before using as a call trigger.`,
-            action: `Check StatusGator for ${vendor.name} before using as an outreach signal`
-          });
-        }
-      });
+async function fetchVendor(vendor) {
+  const base = vendor.statusBase;
+  const [summary, incidents] = await Promise.all([
+    fetchJSON(`${base}/api/v2/summary.json`),
+    fetchJSON(`${base}/api/v2/incidents.json`),
+  ]);
+  return {
+    status:     summary.status,
+    components: summary.components || [],
+    incidents:  incidents.incidents || [],
+  };
+}
 
-      const activeCount = triggers.filter(t => t.signal !== 'WATCH').length;
-      const countEl = document.getElementById('triggerCount');
-      countEl.textContent = activeCount;
-      countEl.style.background = activeCount > 0 ? '#f85149' : '#3fb950';
 
-      if (triggers.length === 0) {
-        feed.innerHTML = `
-          <div class="empty-state">
-            <div class="icon">✅</div>
-            <div>All systems appear operational</div>
-            <div style="margin-top:8px;font-size:12px;">No active trigger events — check back after next refresh</div>
-          </div>
-        `;
-        return;
-      }
-
-      feed.innerHTML = triggers.map(t => `
-        <div class="trigger-item">
-          <div class="trigger-top">
-            <span class="trigger-vendor">${t.vendor}</span>
-            <span class="trigger-signal ${t.signalClass}">${t.signal}</span>
-          </div>
-          <div class="trigger-message">${t.message}</div>
-          <div class="trigger-action">${t.action}</div>
-        </div>
-      `).join('');
-    }
-
-    function updateSummaryBadge() {
-      const badge = document.getElementById('summaryBadge');
-      const vals = Object.values(statusResults);
-      const outages  = vals.filter(r => r.indicator === 'major' || r.indicator === 'critical').length;
-      const degraded = vals.filter(r => r.indicator === 'minor').length;
-
-      if (outages > 0) {
-        badge.className = 'summary-badge badge-outages';
-        badge.textContent = `🔴 ${outages} Outage${outages > 1 ? 's' : ''}`;
-      } else if (degraded > 0) {
-        badge.className = 'summary-badge badge-issues';
-        badge.textContent = `🟡 ${degraded} Degraded`;
-      } else {
-        badge.className = 'summary-badge badge-all-good';
-        badge.textContent = '✅ All Clear';
-      }
-    }
-
-    async function loadStatuses() {
-      const grid = document.getElementById('statusGrid');
-
-      grid.innerHTML = VENDORS.map(v => `
-        <div class="vendor-card status-loading">
-          <div class="vendor-top">
-            <div class="vendor-name">${v.name}</div>
-            <div class="status-dot dot-loading"></div>
-          </div>
-          <div class="vendor-status-text">Checking...</div>
-          <div class="vendor-footer">
-            ${v.type === 'statusgator' ? '<span class="statusgator-tag">⚠ StatusGator</span>' : '<span></span>'}
-            <a href="${v.statusPage}" target="_blank" class="status-link">View Status ↗</a>
-          </div>
-        </div>
-      `).join('');
-
-      const results = await Promise.all(VENDORS.map(v => fetchVendorStatus(v)));
-
-      VENDORS.forEach((vendor, i) => { statusResults[vendor.id] = results[i]; });
-
-      grid.innerHTML = VENDORS.map((v, i) => renderVendorCard(v, results[i])).join('');
-      updateSummaryBadge();
-      buildTriggerFeed();
-
-      document.getElementById('lastUpdated').textContent =
-        'Updated ' + new Date().toLocaleTimeString();
-    }
-
-    const RSS_FEEDS = [
-      'https://www.healthcareitnews.com/rss.xml',
-      'https://www.beckershospitalreview.com/rss/health-it-information-technology.rss'
-    ];
-
-    const EHR_KEYWORDS = {
-      'epic': 'epic',
-      'oracle health': 'oracle',
-      'cerner': 'oracle',
-      'practice fusion': 'practicefusion',
-      'eclinicalworks': 'ecw',
-      ' ecw ': 'ecw',
-      'tebra': 'tebra',
-      'kareo': 'tebra',
-      'nextgen': 'nextgen',
-      'modernizing medicine': 'ehr',
-      'modmed': 'ehr',
-      'drchrono': 'ehr',
-      'electronic health record': 'ehr',
-      'electronic medical record': 'ehr',
-      ' ehr ': 'ehr',
-      ' emr ': 'ehr'
+/* ──────────────────────────────────────────────────────────────
+   HISTORY MANAGEMENT
+────────────────────────────────────────────────────────────── */
+function mergeHistory(vendorId, incidents) {
+  if (!history[vendorId]) history[vendorId] = {};
+  for (const inc of incidents) {
+    history[vendorId][inc.id] = {
+      id:          inc.id,
+      name:        inc.name,
+      status:      inc.status,
+      impact:      inc.impact,
+      created_at:  inc.created_at,
+      resolved_at: inc.resolved_at || null,
+      shortlink:   inc.shortlink    || null,
+      updates: (inc.incident_updates || [])
+        .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 3)
+        .map(u => ({ body: u.body, created_at: u.created_at, status: u.status })),
     };
+  }
+  const sorted = Object.values(history[vendorId])
+    .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, HISTORY_MAX_PER_VDR);
+  history[vendorId] = Object.fromEntries(sorted.map(i => [i.id, i]));
+  persistHistory();
+}
 
-    const TAG_LABELS = {
-      epic: 'Epic', oracle: 'Oracle Health', practicefusion: 'Practice Fusion',
-      ecw: 'eClinicalWorks', tebra: 'Tebra', nextgen: 'NextGen', ehr: 'EHR'
+function getHistory(vendorId, withinDays = null) {
+  const all = Object.values(history[vendorId] || {})
+    .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+  if (!withinDays) return all;
+  const cutoff = Date.now() - withinDays * 86_400_000;
+  return all.filter(i => new Date(i.created_at) > cutoff);
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   MAIN REFRESH LOOP
+────────────────────────────────────────────────────────────── */
+async function refreshAll() {
+  if (isRefreshing) return;
+  isRefreshing = true;
+  fetchErrors  = {};
+
+  const btn  = document.getElementById('refresh-btn');
+  const icon = document.getElementById('refresh-icon');
+  btn.disabled = true;
+  icon.classList.add('spin');
+  document.getElementById('last-updated').textContent = 'Refreshing…';
+
+  clearInterval(countdownTmr);
+  nextRefreshAt = Date.now() + REFRESH_MS;
+
+  const targets = VENDORS.filter(v => v.type === 'statuspage');
+  const settled = await Promise.allSettled(
+    targets.map(v =>
+      fetchVendor(v)
+        .then(data  => ({ id: v.id, data }))
+        .catch(err  => ({ id: v.id, error: err.message }))
+    )
+  );
+
+  settled.forEach(r => {
+    if (r.status !== 'fulfilled') return;
+    const { id, data, error } = r.value;
+    if (error) {
+      fetchErrors[id] = error;
+    } else {
+      liveData[id] = data;
+      mergeHistory(id, data.incidents);
+    }
+  });
+
+  renderAll();
+
+  isRefreshing = false;
+  btn.disabled = false;
+  icon.classList.remove('spin');
+  document.getElementById('last-updated').textContent =
+    `Updated ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+
+  startCountdown();
+}
+
+function startCountdown() {
+  clearInterval(countdownTmr);
+  countdownTmr = setInterval(() => {
+    const rem  = Math.max(0, nextRefreshAt - Date.now());
+    const mins = Math.floor(rem / 60000);
+    const secs = Math.floor((rem % 60000) / 1000);
+    const el   = document.getElementById('countdown');
+    if (el) el.textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
+    if (rem === 0) { clearInterval(countdownTmr); refreshAll(); }
+  }, 1000);
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   STATUS HELPERS
+────────────────────────────────────────────────────────────── */
+const STATUS_MAP = {
+  none:              { label:'All Systems Operational', short:'Operational',     dot:'sdot-green', bg:'bg-green-50',  border:'border-green-200',  text:'text-green-800',  isDown:false, sev:0 },
+  minor:             { label:'Minor Service Issues',    short:'Minor Issues',    dot:'sdot-amber', bg:'bg-amber-50',  border:'border-amber-200',  text:'text-amber-800',  isDown:false, sev:1 },
+  major:             { label:'Major Service Outage',    short:'Major Outage',    dot:'sdot-red',   bg:'bg-red-50',    border:'border-red-200',    text:'text-red-800',    isDown:true,  sev:3 },
+  critical:          { label:'Critical Disruption',     short:'Critical Outage', dot:'sdot-red',   bg:'bg-red-50',    border:'border-red-200',    text:'text-red-800',    isDown:true,  sev:4 },
+  under_maintenance: { label:'Scheduled Maintenance',   short:'Maintenance',     dot:'sdot-blue',  bg:'bg-blue-50',   border:'border-blue-200',   text:'text-blue-800',   isDown:false, sev:0 },
+};
+
+function statusCfg(indicator) {
+  return STATUS_MAP[indicator] || {
+    label:'Status Unknown', short:'Unknown',
+    dot:'sdot-gray', bg:'bg-slate-50', border:'border-slate-200', text:'text-slate-600',
+    isDown:false, sev:0
+  };
+}
+
+function salesLevel(vendorId, indicator) {
+  if (statusCfg(indicator).isDown) return 3;
+  if (getHistory(vendorId, 3).length)  return 2;
+  if (getHistory(vendorId, 7).length)  return 1;
+  return 0;
+}
+
+function daysAgo(dateStr) {
+  return dateStr ? Math.floor((Date.now() - new Date(dateStr)) / 86_400_000) : null;
+}
+
+function fmtDate(dateStr) {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleString('en-US', {
+    month:'short', day:'numeric', year:'numeric',
+    hour:'numeric', minute:'2-digit', timeZoneName:'short',
+  });
+}
+
+function fmtDuration(start, end) {
+  if (!start || !end) return null;
+  const ms = new Date(end) - new Date(start);
+  if (ms < 0) return null;
+  const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+}
+
+const IMPACT_STYLE = {
+  critical: 'bg-red-100 text-red-800 border border-red-200',
+  major:    'bg-red-50  text-red-700  border border-red-200',
+  minor:    'bg-amber-50 text-amber-700 border border-amber-200',
+  none:     'bg-slate-100 text-slate-600',
+};
+const impactStyle = i => IMPACT_STYLE[i] || 'bg-slate-100 text-slate-600';
+
+
+/* ──────────────────────────────────────────────────────────────
+   SALES OPENER GENERATOR
+────────────────────────────────────────────────────────────── */
+function salesOpener(vendor, level) {
+  const vName = vendor.name;
+
+  if (level === 3) {
+    const affected = (liveData[vendor.id]?.components || [])
+      .filter(c => c.status !== 'operational' && !c.group)
+      .map(c => c.name).slice(0,2).join(' and ');
+    const affectedText = affected ? ` — specifically ${affected}` : '';
+    return `Hi [First Name], I noticed ${vName} is experiencing a live outage right now${affectedText}. That kind of disruption hits practices hard. I'd love to take 15 minutes to show you how athenahealth approaches reliability and what our uptime track record looks like. Are you available for a quick call?`;
+  }
+
+  const recent = getHistory(vendor.id, level === 2 ? 3 : 7);
+  const latest = recent[0];
+
+  if (latest) {
+    const d        = daysAgo(latest.created_at);
+    const dur      = fmtDuration(latest.created_at, latest.resolved_at);
+    const dayText  = d === 0 ? 'earlier today' : d === 1 ? 'yesterday' : `${d} days ago`;
+    const durText  = dur ? ` for ${dur}` : '';
+    return `Hi [First Name], I saw that ${vName} had a service disruption ${dayText}${durText} — ${latest.name}. I wanted to check in to see how that impacted your practice, and share how athenahealth approaches platform reliability. Would you be open to a 15-minute call this week?`;
+  }
+
+  return `Hi [First Name], I noticed ${vName} has had some recent service issues and wanted to reach out. Happy to share how athenahealth approaches uptime and what that means for a practice day-to-day. Would you be open to a quick conversation?`;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   RENDER
+────────────────────────────────────────────────────────────── */
+function renderAll() {
+  const sorted = [...VENDORS].sort((a, b) => {
+    const score = v => {
+      if (v.type === 'none') return -2;
+      if (!liveData[v.id] && !fetchErrors[v.id]) return -1;
+      const ind = liveData[v.id]?.status?.indicator || 'unknown';
+      return salesLevel(v.id, ind);
     };
+    return score(b) - score(a);
+  });
 
-    function getNewsTag(title, desc) {
-      const text = (' ' + title + ' ' + desc + ' ').toLowerCase();
-      for (const [kw, tag] of Object.entries(EHR_KEYWORDS)) {
-        if (text.includes(kw)) return tag;
-      }
-      return null;
-    }
+  document.getElementById('vendor-grid').innerHTML =
+    sorted.map(renderCard).join('');
 
-    function timeAgo(dateStr) {
-      const diff = Math.floor((new Date() - new Date(dateStr)) / 1000);
-      if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
-      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-      return Math.floor(diff / 86400) + 'd ago';
-    }
+  const live    = VENDORS.filter(v => v.type === 'statuspage');
+  const loaded  = live.filter(v => liveData[v.id]);
+  const down    = loaded.filter(v => statusCfg(liveData[v.id]?.status?.indicator).isDown);
+  const sevenDayTotal = VENDORS.reduce((n,v) => n + getHistory(v.id, 7).length, 0);
 
-    async function loadNews() {
-      const feed = document.getElementById('newsFeed');
-      let allItems = [];
+  document.getElementById('stat-total') .textContent = VENDORS.length;
+  document.getElementById('stat-ok')    .textContent = loaded.length - down.length;
+  document.getElementById('stat-down')  .textContent = down.length;
+  document.getElementById('stat-recent').textContent = sevenDayTotal;
 
-      for (const rssUrl of RSS_FEEDS) {
-        try {
-          const res = await fetch(
-            `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=20`
-          );
-          const data = await res.json();
-          if (data.status === 'ok' && data.items) allItems = allItems.concat(data.items);
-        } catch (e) {}
-      }
+  if (down.length) {
+    document.getElementById('outage-banner').classList.remove('hidden');
+    document.getElementById('outage-banner-text').textContent =
+      down.map(v => v.name).join(', ') + ' — live outage cards below';
+  } else {
+    document.getElementById('outage-banner').classList.add('hidden');
+  }
+}
 
-      const relevant = allItems
-        .filter(item => getNewsTag(item.title || '', item.description || '') !== null)
-        .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+function renderCard(vendor) {
+  if (vendor.type === 'none')                        return noFeedCard(vendor);
+  if (!liveData[vendor.id] && !fetchErrors[vendor.id]) return skeletonCard(vendor);
+  if (fetchErrors[vendor.id])                        return errorCard(vendor);
+  return liveCard(vendor);
+}
 
-      if (relevant.length === 0) {
-        feed.innerHTML = `
-          <div class="empty-state">
-            <div class="icon">📰</div>
-            <div>No EHR news found right now</div>
-            <div style="margin-top:8px;font-size:12px;">Try refreshing in a few minutes</div>
-          </div>
-        `;
-        return;
-      }
+function liveCard(vendor) {
+  const data    = liveData[vendor.id];
+  const cfg     = statusCfg(data.status.indicator);
+  const level   = salesLevel(vendor.id, data.status.indicator);
+  const hist    = getHistory(vendor.id);
+  const recent7 = getHistory(vendor.id, 7);
 
-      feed.innerHTML = relevant.slice(0, 10).map(item => {
-        const tag = getNewsTag(item.title, item.description || '');
-        return `
-          <div class="news-item">
-            <div class="news-top">
-              <span class="news-tag tag-${tag}">${TAG_LABELS[tag] || 'EHR'}</span>
+  const affected = data.components
+    .filter(c => c.status !== 'operational' && !c.group)
+    .slice(0, 4);
+
+  const cardBg    = cfg.isDown ? 'bg-red-50'    : level === 2 ? 'bg-amber-50/40' : 'bg-white';
+  const cardBorder= cfg.isDown ? 'card-outage'  : level === 2 ? 'card-recent'    : '';
+
+  let badge = '';
+  if (vendor.isOwn) {
+    badge = `<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 whitespace-nowrap">Your Platform</span>`;
+  } else if (vendor.isTarget && level >= 1) {
+    const cls = level === 3
+      ? 'bg-red-600 text-white animate-pulse'
+      : level === 2 ? 'bg-amber-500 text-white'
+      : 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+    const lbl = level === 3 ? '🔥 Live Outage' : level === 2 ? '⚡ Recent Down' : '📅 7-Day Issue';
+    badge = `<span class="text-xs font-semibold px-2 py-0.5 rounded-full ${cls} whitespace-nowrap">${lbl}</span>`;
+  } else if (vendor.isTarget) {
+    badge = `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap">Prospect</span>`;
+  }
+
+  const compChips = affected.map(c => {
+    const chipCls = c.status === 'major_outage'
+      ? 'bg-red-50 border-red-200 text-red-700'
+      : c.status === 'partial_outage'
+        ? 'bg-amber-50 border-amber-200 text-amber-700'
+        : 'bg-blue-50 border-blue-200 text-blue-700';
+    const dotCls = c.status === 'major_outage' ? 'bg-red-500'
+      : c.status === 'partial_outage' ? 'bg-amber-500' : 'bg-blue-500';
+    return `
+      <span class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg border ${chipCls}">
+        <span class="w-1.5 h-1.5 rounded-full ${dotCls}"></span>
+        ${c.name}
+      </span>`;
+  }).join('');
+
+  const openerPanel = vendor.isTarget && level >= 1 ? `
+    <div class="border-t ${cfg.isDown ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50/60'} p-4">
+      <p class="text-xs font-bold ${cfg.isDown ? 'text-red-800' : 'text-amber-800'} mb-2 flex items-center gap-1.5">
+        💬 Suggested Outreach Opener
+      </p>
+      <p id="opener-text-${vendor.id}"
+         class="text-xs ${cfg.isDown ? 'text-red-700' : 'text-amber-700'} italic leading-relaxed mb-2.5">
+        "${salesOpener(vendor, level)}"
+      </p>
+      <button onclick="copyOpener('${vendor.id}', this)"
+              class="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors
+                     ${cfg.isDown ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600'} text-white">
+        Copy to clipboard
+      </button>
+    </div>
+  ` : '';
+
+  const histRows = hist.slice(0, 15).map(incRow).join('');
+  const histSection = `
+    <div class="border-t border-slate-100">
+      <button onclick="toggleHistory('${vendor.id}')"
+              class="w-full px-5 py-3 flex items-center justify-between text-xs font-semibold
+                     text-slate-500 hover:bg-slate-50 transition-colors">
+        <span class="flex items-center gap-1.5">
+          📋
+          ${hist.length
+            ? `Incident History <span class="font-normal text-slate-400 ml-1">${hist.length} stored</span>`
+            : `<span class="font-normal text-slate-400">No history yet — accumulates as you use the dashboard</span>`}
+        </span>
+        <svg id="chev-${vendor.id}" class="inc-chevron w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+      <div class="inc-body" id="hist-${vendor.id}">
+        ${hist.length
+          ? `<div class="px-5 pb-5 space-y-2.5">
+               ${histRows}
+               ${hist.length > 15 ? `<p class="text-xs text-center text-slate-400 pt-1">+ ${hist.length - 15} older incidents in storage</p>` : ''}
+             </div>`
+          : `<p class="px-5 pb-4 text-xs text-slate-400 italic">
+               Incident records will appear here once fetched. Keep this tab open to build a history.
+             </p>`}
+      </div>
+    </div>
+  `;
+
+  return `
+    <div class="vendor-card fade-in rounded-2xl border border-slate-200 ${cardBg} ${cardBorder} overflow-hidden">
+      <div class="p-5">
+        <div class="flex items-start justify-between gap-3 mb-4">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-xl"
+                 style="background:${vendor.accent}18;border:1.5px solid ${vendor.accent}30">
+              ${vendor.emoji}
             </div>
-            <a href="${item.link}" target="_blank" class="news-title">${item.title}</a>
-            <div class="news-meta">${item.author ? item.author + ' · ' : ''}${timeAgo(item.pubDate)}</div>
+            <div class="min-w-0">
+              <h3 class="font-bold text-slate-900 text-sm truncate">${vendor.name}</h3>
+              <p  class="text-xs text-slate-400 mt-0.5 leading-tight">${vendor.description}</p>
+            </div>
           </div>
-        `;
-      }).join('');
-    }
+          <div class="flex-shrink-0">${badge}</div>
+        </div>
 
-    async function init() {
-      document.getElementById('summaryBadge').className = 'summary-badge badge-loading';
-      document.getElementById('summaryBadge').textContent = '⏳ Loading';
-      document.getElementById('triggerFeed').innerHTML = '<div class="loading-text">Analyzing signals...</div>';
-      document.getElementById('newsFeed').innerHTML = '<div class="loading-text">Fetching latest news...</div>';
-      await Promise.all([loadStatuses(), loadNews()]);
-    }
+        <div class="flex items-center justify-between px-3.5 py-2.5 rounded-xl
+                    ${cfg.bg} border ${cfg.border}">
+          <div class="flex items-center gap-2">
+            <span class="sdot ${cfg.dot} ${cfg.isDown ? 'pulse-dot' : ''}"></span>
+            <span class="text-sm font-semibold ${cfg.text}">${cfg.short}</span>
+            ${recent7.length && !cfg.isDown
+              ? `<span class="text-xs ${cfg.text} opacity-60">· ${recent7.length} in 7d</span>` : ''}
+          </div>
+          <a href="${vendor.statusPageUrl}" target="_blank" rel="noopener"
+             class="text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium flex-shrink-0">
+            Status page ↗
+          </a>
+        </div>
 
-    init();
-    setInterval(init, 600000);
-  </script>
+        ${affected.length ? `
+          <div class="mt-3">
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Affected</p>
+            <div class="flex flex-wrap gap-1.5">${compChips}</div>
+          </div>` : ''}
+      </div>
+
+      ${openerPanel}
+      ${histSection}
+    </div>
+  `;
+}
+
+function incRow(inc) {
+  const d    = daysAgo(inc.created_at);
+  const dur  = fmtDuration(inc.created_at, inc.resolved_at);
+  const live = !inc.resolved_at;
+  const dTxt = d === null ? '' : d === 0 ? 'Today' : d === 1 ? 'Yesterday' : `${d}d ago`;
+
+  return `
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3.5">
+      <div class="flex items-start justify-between gap-2 mb-2">
+        <p class="text-xs font-semibold text-slate-800 leading-snug flex-1">${inc.name}</p>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          ${live ? `<span class="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 animate-pulse">ACTIVE</span>` : ''}
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium ${impactStyle(inc.impact)}">${inc.impact||'?'}</span>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 mb-2">
+        <span>🕐 ${fmtDate(inc.created_at)}</span>
+        ${inc.resolved_at
+          ? `<span>✅ ${fmtDate(inc.resolved_at)}</span>${dur ? `<span>⏱ ${dur}</span>` : ''}`
+          : `<span class="text-red-600 font-semibold">⚠️ Unresolved · ${inc.status}</span>`}
+        ${dTxt ? `<span class="ml-auto text-slate-400">${dTxt}</span>` : ''}
+      </div>
+      ${inc.updates?.[0] ? `
+        <div class="bg-slate-50 rounded-lg px-3 py-2 text-xs text-slate-600 leading-relaxed">
+          <span class="font-semibold capitalize">${inc.updates[0].status}:</span>
+          ${inc.updates[0].body.length > 260
+            ? inc.updates[0].body.slice(0,260) + '…'
+            : inc.updates[0].body}
+        </div>` : ''}
+      ${inc.shortlink ? `
+        <a href="${inc.shortlink}" target="_blank" rel="noopener"
+           class="inline-block mt-2 text-xs text-blue-600 hover:underline">
+          Full incident report ↗
+        </a>` : ''}
+    </div>
+  `;
+}
+
+function noFeedCard(vendor) {
+  return `
+    <div class="vendor-card fade-in rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden opacity-70">
+      <div class="p-5">
+        <div class="flex items-start justify-between gap-3 mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-xl">
+              ${vendor.emoji}
+            </div>
+            <div>
+              <h3 class="font-bold text-slate-700 text-sm">${vendor.name}</h3>
+              <p class="text-xs text-slate-400 mt-0.5">${vendor.description}</p>
+            </div>
+          </div>
+          <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-200 text-slate-500 flex-shrink-0 whitespace-nowrap">No Public Feed</span>
+        </div>
+        <div class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-100 border border-slate-200 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="sdot sdot-gray"></span>
+            <span class="text-sm font-semibold text-slate-500">Status Unknown</span>
+          </div>
+          <a href="${vendor.statusPageUrl}" target="_blank" rel="noopener"
+             class="text-xs text-blue-600 hover:underline font-medium">Check manually ↗</a>
+        </div>
+        <p class="text-xs text-slate-500 leading-relaxed bg-slate-100 rounded-xl px-3 py-2">
+          ℹ️ ${vendor.noFeedNote}
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+function errorCard(vendor) {
+  return `
+    <div class="vendor-card fade-in rounded-2xl border border-slate-200 bg-white overflow-hidden">
+      <div class="p-5">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+               style="background:${vendor.accent}18;border:1.5px solid ${vendor.accent}30">
+            ${vendor.emoji}
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 text-sm">${vendor.name}</h3>
+            <p class="text-xs text-slate-400">${vendor.description}</p>
+          </div>
+        </div>
+        <div class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="flex items-center gap-2">
+            <span class="sdot sdot-gray"></span>
+            <span class="text-sm text-slate-500">Fetch failed</span>
+          </div>
+          <a href="${vendor.statusPageUrl}" target="_blank" rel="noopener"
+             class="text-xs text-blue-600 hover:underline">Check manually ↗</a>
+        </div>
+        <p class="mt-2 text-xs text-slate-400 italic">
+          ${fetchErrors[vendor.id]} — may be a temporary CORS restriction or the status page itself is down.
+          <a href="${vendor.statusPageUrl}" target="_blank" class="text-blue-500 hover:underline">Open directly ↗</a>
+        </p>
+        ${getHistory(vendor.id).length ? `
+          <div class="mt-4">
+            <p class="text-xs font-semibold text-slate-500 mb-2">Stored history (${getHistory(vendor.id).length} incidents):</p>
+            ${getHistory(vendor.id).slice(0,3).map(incRow).join('')}
+          </div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function skeletonCard(vendor) {
+  return `
+    <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden p-5">
+      <div class="flex items-center gap-3 mb-4 animate-pulse">
+        <div class="w-10 h-10 rounded-xl bg-slate-200 flex-shrink-0"></div>
+        <div class="flex-1 space-y-2">
+          <div class="h-3.5 w-32 bg-slate-200 rounded-full"></div>
+          <div class="h-3 w-48 bg-slate-100 rounded-full"></div>
+        </div>
+      </div>
+      <div class="h-11 bg-slate-100 rounded-xl animate-pulse"></div>
+      <p class="text-xs text-slate-400 italic mt-3 text-center">Loading ${vendor.name}…</p>
+    </div>
+  `;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   UI INTERACTIONS
+────────────────────────────────────────────────────────────── */
+function toggleHistory(vendorId) {
+  const body  = document.getElementById(`hist-${vendorId}`);
+  const chev  = document.getElementById(`chev-${vendorId}`);
+  body.classList.toggle('open');
+  chev.classList.toggle('open');
+}
+
+function copyOpener(vendorId, btn) {
+  const el = document.getElementById(`opener-text-${vendorId}`);
+  if (!el) return;
+  const text = el.textContent.trim().replace(/^"|"$/g, '');
+  const orig = btn.textContent;
+
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => btn.textContent = orig, 2000);
+    });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  }
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   BOOT
+────────────────────────────────────────────────────────────── */
+document.getElementById('vendor-grid').innerHTML =
+  VENDORS.map(skeletonCard).join('');
+
+refreshAll();
+</script>
+
 </body>
 </html>
