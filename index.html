@@ -94,7 +94,6 @@
     html.dark #dark-toggle                  { background-color: #334155 !important; border-color: #475569 !important; color: #e2e8f0 !important; }
     html.dark #dark-toggle:hover            { background-color: #475569 !important; }
 
-    /* No-feed section dark overrides */
     html.dark .nofeed-section               { background-color: #1e293b !important; border-color: #334155 !important; }
     html.dark .nofeed-row                   { background-color: #293548 !important; border-color: #334155 !important; }
     html.dark .nofeed-row:hover             { background-color: #334155 !important; }
@@ -180,9 +179,7 @@
   <div id="vendor-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-12">
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════
-       NO PUBLIC STATUS PAGE SECTION
-  ═══════════════════════════════════════════════════════ -->
+  <!-- NO PUBLIC STATUS PAGE SECTION -->
   <div class="nofeed-section bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-10">
     <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
       <div>
@@ -316,7 +313,6 @@
         Red cards = <strong>live outage</strong>, warm-call right now.
         Amber = <strong>outage in last 3 days</strong>, pain is fresh.
         Yellow badge = <strong>7-day incident</strong>, still a valid opener.
-        Click "Copy opener" for ready-to-send outreach.
       </p>
     </div>
   </div>
@@ -327,7 +323,7 @@
 'use strict';
 
 /* ─────────────────────────────────────────────
-   VENDOR CONFIG — all have public Statuspage APIs
+   VENDOR CONFIG
 ───────────────────────────────────────────── */
 const VENDORS = [
   {
@@ -338,7 +334,6 @@ const VENDORS = [
     accent:       '#7c3aed',
     statusBase:   'https://status.practicefusion.com',
     statusPageUrl:'https://status.practicefusion.com',
-    isTarget:     true,
   },
   {
     id:           'tebra',
@@ -348,7 +343,6 @@ const VENDORS = [
     accent:       '#0891b2',
     statusBase:   'https://status.tebra.com',
     statusPageUrl:'https://status.tebra.com',
-    isTarget:     true,
   },
   {
     id:           'drchrono',
@@ -358,7 +352,6 @@ const VENDORS = [
     accent:       '#059669',
     statusBase:   'https://status.drchrono.com',
     statusPageUrl:'https://status.drchrono.com',
-    isTarget:     true,
   },
   {
     id:           'advancedmd',
@@ -368,7 +361,6 @@ const VENDORS = [
     accent:       '#d97706',
     statusBase:   'https://status.advancedmd.com',
     statusPageUrl:'https://status.advancedmd.com',
-    isTarget:     true,
   },
   {
     id:           'nextgen',
@@ -378,7 +370,6 @@ const VENDORS = [
     accent:       '#2563eb',
     statusBase:   'https://nextgen.statuspage.io',
     statusPageUrl:'https://nextgen.statuspage.io',
-    isTarget:     true,
   },
   {
     id:           'veradigm',
@@ -388,7 +379,6 @@ const VENDORS = [
     accent:       '#ea580c',
     statusBase:   'https://status.vsuite.veradigmcloud.com',
     statusPageUrl:'https://status.vsuite.veradigmcloud.com',
-    isTarget:     true,
   },
   {
     id:           'greenway',
@@ -398,7 +388,6 @@ const VENDORS = [
     accent:       '#16a34a',
     statusBase:   'https://greenway.statuspage.io',
     statusPageUrl:'https://greenway.statuspage.io',
-    isTarget:     true,
   },
   {
     id:           'webpt',
@@ -408,7 +397,6 @@ const VENDORS = [
     accent:       '#0284c7',
     statusBase:   'https://status.webpt.com',
     statusPageUrl:'https://status.webpt.com',
-    isTarget:     true,
   },
   {
     id:           'simplepractice',
@@ -418,7 +406,6 @@ const VENDORS = [
     accent:       '#8b5cf6',
     statusBase:   'https://simplepracticestatus.com',
     statusPageUrl:'https://simplepracticestatus.com',
-    isTarget:     true,
   },
   {
     id:           'isalus',
@@ -428,7 +415,6 @@ const VENDORS = [
     accent:       '#0891b2',
     statusBase:   'https://isalushealthcare.statuspage.io',
     statusPageUrl:'https://isalushealthcare.statuspage.io',
-    isTarget:     true,
   },
 ];
 
@@ -634,34 +620,6 @@ const IMPACT_STYLE = {
 const impactStyle = i => IMPACT_STYLE[i] || 'bg-slate-100 text-slate-600';
 
 /* ─────────────────────────────────────────────
-   SALES OPENER
-───────────────────────────────────────────── */
-function salesOpener(vendor, level) {
-  const vName = vendor.name;
-
-  if (level === 3) {
-    const affected = (liveData[vendor.id]?.components || [])
-      .filter(c => c.status !== 'operational' && !c.group)
-      .map(c => c.name).slice(0,2).join(' and ');
-    const affectedText = affected ? ` — specifically ${affected}` : '';
-    return `Hi [First Name], I noticed ${vName} is experiencing a live outage right now${affectedText}. That kind of disruption hits practices hard. I'd love to take 15 minutes to show you how athenahealth approaches reliability and what our uptime track record looks like. Are you available for a quick call?`;
-  }
-
-  const recent = getHistory(vendor.id, level === 2 ? 3 : 7);
-  const latest = recent[0];
-
-  if (latest) {
-    const d       = daysAgo(latest.created_at);
-    const dur     = fmtDuration(latest.created_at, latest.resolved_at);
-    const dayText = d === 0 ? 'earlier today' : d === 1 ? 'yesterday' : `${d} days ago`;
-    const durText = dur ? ` for ${dur}` : '';
-    return `Hi [First Name], I saw that ${vName} had a service disruption ${dayText}${durText} — ${latest.name}. I wanted to check in to see how that impacted your practice, and share how athenahealth approaches platform reliability. Would you be open to a 15-minute call this week?`;
-  }
-
-  return `Hi [First Name], I noticed ${vName} has had some recent service issues and wanted to reach out. Happy to share how athenahealth approaches uptime and what that means for a practice day-to-day. Would you be open to a quick conversation?`;
-}
-
-/* ─────────────────────────────────────────────
    RENDER
 ───────────────────────────────────────────── */
 function renderAll() {
@@ -742,23 +700,6 @@ function liveCard(vendor) {
       </span>`;
   }).join('');
 
-  const openerPanel = level >= 1 ? `
-    <div class="border-t ${cfg.isDown ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50/60'} p-4">
-      <p class="text-xs font-bold ${cfg.isDown ? 'text-red-800' : 'text-amber-800'} mb-2 flex items-center gap-1.5">
-        💬 Suggested Outreach Opener
-      </p>
-      <p id="opener-text-${vendor.id}"
-         class="text-xs ${cfg.isDown ? 'text-red-700' : 'text-amber-700'} italic leading-relaxed mb-2.5">
-        "${salesOpener(vendor, level)}"
-      </p>
-      <button onclick="copyOpener('${vendor.id}', this)"
-              class="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors
-                     ${cfg.isDown ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600'} text-white">
-        Copy to clipboard
-      </button>
-    </div>
-  ` : '';
-
   const histRows    = hist.slice(0, 15).map(incRow).join('');
   const histSection = `
     <div class="border-t border-slate-100">
@@ -826,7 +767,6 @@ function liveCard(vendor) {
           </div>` : ''}
       </div>
 
-      ${openerPanel}
       ${histSection}
     </div>
   `;
@@ -930,30 +870,6 @@ function toggleHistory(vendorId) {
   const chev = document.getElementById(`chev-${vendorId}`);
   body.classList.toggle('open');
   chev.classList.toggle('open');
-}
-
-function copyOpener(vendorId, btn) {
-  const el = document.getElementById(`opener-text-${vendorId}`);
-  if (!el) return;
-  const text = el.textContent.trim().replace(/^"|"$/g, '');
-  const orig = btn.textContent;
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(() => {
-      btn.textContent = '✓ Copied!';
-      setTimeout(() => btn.textContent = orig, 2000);
-    });
-  } else {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    btn.textContent = '✓ Copied!';
-    setTimeout(() => btn.textContent = orig, 2000);
-  }
 }
 
 function toggleDark() {
